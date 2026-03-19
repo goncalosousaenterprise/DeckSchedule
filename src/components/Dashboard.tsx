@@ -34,15 +34,18 @@ export function Dashboard({ user }: { user: any }) {
           desk_id,
           status,
           user_name,
+          time_of_day,
           desks (name)
         `)
         .eq('date', today);
 
       if (bookingsError) throw bookingsError;
 
+      const uniqueBookedDesks = new Set(todayBookings?.map(b => b.desk_id)).size;
+
       setStats({
         totalDesks: desks?.length || 0,
-        bookedDesks: todayBookings?.length || 0,
+        bookedDesks: uniqueBookedDesks,
       });
 
       setBookings(todayBookings || []);
@@ -65,7 +68,7 @@ export function Dashboard({ user }: { user: any }) {
     ? Math.round((stats.bookedDesks / stats.totalDesks) * 100) 
     : 0;
 
-  const myBooking = bookings.find(b => b.user_id === user.id);
+  const myBookings = bookings.filter(b => b.user_id === user.id);
 
   return (
     <div className="space-y-8">
@@ -100,18 +103,22 @@ export function Dashboard({ user }: { user: any }) {
             <h3 className="font-medium">Your Status</h3>
           </div>
           
-          {myBooking ? (
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium mb-3">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                Booked for today
-              </div>
-              <p className="text-zinc-900 font-medium mb-1">
-                Desk: {myBooking.desks?.name}
-              </p>
-              <p className="text-sm text-zinc-500">
-                You're all set for today.
-              </p>
+          {myBookings.length > 0 ? (
+            <div className="space-y-4">
+              {myBookings.map(booking => (
+                <div key={booking.id} className="border-b border-zinc-100 last:border-0 pb-4 last:pb-0">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium mb-3">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Booked for <span className="capitalize">{booking.time_of_day?.replace('_', ' ') || 'entire day'}</span>
+                  </div>
+                  <p className="text-zinc-900 font-medium mb-1">
+                    Desk: {booking.desks?.name}
+                  </p>
+                  <p className="text-sm text-zinc-500">
+                    You're all set for today.
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <div>
@@ -145,8 +152,8 @@ export function Dashboard({ user }: { user: any }) {
                       <p className="font-medium text-zinc-900">
                         {booking.user_id === user.id ? 'You' : (booking.user_name || `User ${booking.user_id.substring(0, 6)}`)}
                       </p>
-                      <p className="text-sm text-zinc-500">
-                        Booked
+                      <p className="text-sm text-zinc-500 capitalize">
+                        {booking.time_of_day?.replace('_', ' ') || 'entire day'}
                       </p>
                     </div>
                   </div>

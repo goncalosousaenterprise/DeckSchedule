@@ -12,6 +12,7 @@ export function Booking({ user }: { user: any }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [userBookedDates, setUserBookedDates] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [timeOfDay, setTimeOfDay] = useState<'entire_day' | 'morning' | 'afternoon'>('entire_day');
 
   // Generate next 14 days
   const dates = Array.from({ length: 14 }).map((_, i) => addDays(startOfDay(new Date()), i));
@@ -61,7 +62,7 @@ export function Booking({ user }: { user: any }) {
       // Fetch bookings for selected date
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*, user_name')
+        .select('*, user_name, time_of_day')
         .eq('date', dateStr);
 
       if (bookingsError) throw bookingsError;
@@ -81,6 +82,20 @@ export function Booking({ user }: { user: any }) {
       setActionLoading(deskId);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
+      // Check if user already has an overlapping booking
+      const myBookingsToday = bookings.filter(b => b.user_id === user.id);
+      const hasOverlap = myBookingsToday.some(b => 
+        b.time_of_day === 'entire_day' || 
+        timeOfDay === 'entire_day' || 
+        b.time_of_day === timeOfDay
+      );
+
+      if (hasOverlap) {
+        toast.error(`You already have a booking that overlaps with ${timeOfDay.replace('_', ' ')}.`);
+        setActionLoading(null);
+        return;
+      }
+
       const { error } = await supabase
         .from('bookings')
         .insert([
@@ -89,6 +104,7 @@ export function Booking({ user }: { user: any }) {
             desk_id: deskId,
             date: dateStr,
             status: 'booked',
+            time_of_day: timeOfDay,
             user_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
           }
         ]);
@@ -134,8 +150,16 @@ export function Booking({ user }: { user: any }) {
     }
   };
 
-  const userBooking = bookings.find(b => b.user_id === user.id);
-  const isFullyBooked = bookings.length >= desks.length && desks.length > 0;
+  const myBookingsToday = bookings.filter(b => b.user_id === user.id);
+  
+  const isFullyBooked = desks.length > 0 && desks.every(desk => {
+    const deskBookings = bookings.filter(b => b.desk_id === desk.id);
+    return deskBookings.some(b => 
+      b.time_of_day === 'entire_day' || 
+      timeOfDay === 'entire_day' || 
+      b.time_of_day === timeOfDay
+    );
+  });
 
   return (
     <div className="space-y-8">
@@ -145,7 +169,7 @@ export function Booking({ user }: { user: any }) {
       </div>
 
       {/* Date Selector */}
-      <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
+      <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto mb-6">
         <div className="flex gap-2 min-w-max">
           {dates.map((date) => {
             const isSelected = isSameDay(date, selectedDate);
@@ -183,6 +207,28 @@ export function Booking({ user }: { user: any }) {
         </div>
       </div>
 
+      {/* Time of Day Selector */}
+      <div className="flex bg-zinc-100 p-1 rounded-xl w-full max-w-md mb-6">
+        {[
+          { id: 'entire_day', label: 'Entire Day' },
+          { id: 'morning', label: 'Morning' },
+          { id: 'afternoon', label: 'Afternoon' }
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTimeOfDay(t.id as any)}
+            className={cn(
+              "flex-1 py-2 text-sm font-medium rounded-lg transition-all",
+              timeOfDay === t.id 
+                ? "bg-white text-zinc-900 shadow-sm" 
+                : "text-zinc-500 hover:text-zinc-700"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* Main Content */}
       <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
@@ -204,41 +250,55 @@ export function Booking({ user }: { user: any }) {
           </div>
         ) : (
           <div className="p-6">
-            {userBooking ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex items-center justify-between mb-8">
-                <div>
-                  <div className="flex items-center gap-2 text-emerald-700 font-medium mb-1">
-                    <Check className="w-5 h-5" />
-                    You have a desk booked
+            {myBookingsToday.length > 0 ? (
+              <div className="space-y-3 mb-8">
+                {myBookingsToday.map(booking => (
+                  <div key={booking.id} className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-emerald-700 font-medium mb-1">
+                        <Check className="w-5 h-5" />
+                        You have a desk booked <span className="capitalize">({booking.time_of_day?.replace('_', ' ') || 'entire day'})</span>
+                      </div>
+                      <p className="text-emerald-900 text-lg font-semibold">
+                        {desks.find(d => d.id === booking.desk_id)?.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleCancelBooking(booking.id)}
+                      disabled={actionLoading === booking.id}
+                      className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg font-medium hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {actionLoading === booking.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Cancel Booking
+                    </button>
                   </div>
-                  <p className="text-emerald-900 text-lg font-semibold">
-                    {desks.find(d => d.id === userBooking.desk_id)?.name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleCancelBooking(userBooking.id)}
-                  disabled={actionLoading === userBooking.id}
-                  className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg font-medium hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {actionLoading === userBooking.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <X className="w-4 h-4" />
-                  )}
-                  Cancel Booking
-                </button>
+                ))}
               </div>
             ) : isFullyBooked ? (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center mb-8">
-                <p className="text-amber-800 font-medium">The office is fully booked on this day.</p>
+                <p className="text-amber-800 font-medium">The office is fully booked for this time.</p>
               </div>
             ) : null}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {desks.map((desk) => {
-                const booking = bookings.find(b => b.desk_id === desk.id);
-                const isBooked = !!booking;
-                const isMyBooking = booking?.user_id === user.id;
+                const deskBookings = bookings.filter(b => b.desk_id === desk.id);
+                
+                // Check if it's booked for the currently selected timeOfDay
+                const overlappingBookings = deskBookings.filter(b => 
+                  b.time_of_day === 'entire_day' || 
+                  timeOfDay === 'entire_day' || 
+                  b.time_of_day === timeOfDay
+                );
+
+                const isBooked = overlappingBookings.length > 0;
+                const myOverlappingBooking = overlappingBookings.find(b => b.user_id === user.id);
+                const isMyBooking = !!myOverlappingBooking;
+                const displayBooking = myOverlappingBooking || overlappingBookings[0];
 
                 return (
                   <div
@@ -252,7 +312,7 @@ export function Booking({ user }: { user: any }) {
                         : "border-zinc-200 bg-white hover:border-zinc-900 cursor-pointer"
                     )}
                     onClick={() => {
-                      if (!isBooked && !userBooking) {
+                      if (!isBooked && !myBookingsToday.some(b => b.time_of_day === 'entire_day' || timeOfDay === 'entire_day' || b.time_of_day === timeOfDay)) {
                         handleBookDesk(desk.id);
                       }
                     }}
@@ -270,7 +330,7 @@ export function Booking({ user }: { user: any }) {
                         {desk.name}
                       </p>
                       <p className="text-xs text-zinc-500 mt-0.5">
-                        {isMyBooking ? 'Your desk' : isBooked ? (booking.user_name || 'Booked') : 'Available'}
+                        {isMyBooking ? 'Your desk' : isBooked ? (displayBooking?.user_name || 'Booked') : 'Available'}
                       </p>
                     </div>
 

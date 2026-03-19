@@ -15,9 +15,8 @@ CREATE TABLE bookings (
   date DATE NOT NULL,
   status TEXT NOT NULL DEFAULT 'booked',
   user_name TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE(user_id, date), -- A user can only book 1 desk per day
-  UNIQUE(desk_id, date)  -- A desk can only be booked by 1 user per day
+  time_of_day TEXT NOT NULL DEFAULT 'entire_day',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- 3. Enable Row Level Security (RLS)
