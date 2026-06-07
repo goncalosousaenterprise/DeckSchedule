@@ -11,6 +11,10 @@ import { Dashboard } from './components/Dashboard';
 import { Booking } from './components/Booking';
 import { Calendar, LayoutDashboard, LogOut, AlertCircle, Monitor } from 'lucide-react';
 import { cn } from './lib/utils';
+import { detectLang, getTranslations } from './lib/i18n';
+
+const lang = detectLang();
+const t = getTranslations(lang).app;
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -38,20 +42,20 @@ export default function App() {
         <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-red-200">
           <div className="flex items-center gap-3 text-red-600 mb-4">
             <AlertCircle className="w-6 h-6" />
-            <h1 className="text-xl font-semibold">Missing Database Connection</h1>
+            <h1 className="text-xl font-semibold">{t.missingDb}</h1>
           </div>
           <p className="text-zinc-600 mb-6 text-sm leading-relaxed">
-            The application cannot connect to Supabase. You need to add your Supabase credentials to the AI Studio environment.
+            {t.missingDbText}
           </p>
           <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Required Environment Variables</p>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">{t.requiredVars}</p>
             <ul className="space-y-2 text-sm text-zinc-700 font-mono">
               <li>VITE_SUPABASE_URL</li>
               <li>VITE_SUPABASE_ANON_KEY</li>
             </ul>
           </div>
           <p className="text-xs text-zinc-500 mt-4">
-            Open the Settings / Secrets menu in AI Studio to add these variables, then the app will automatically reload.
+            {t.missingDbHint}
           </p>
         </div>
       </div>
@@ -77,7 +81,7 @@ export default function App() {
             </div>
             <span className="font-semibold text-lg tracking-tight">DeskSchedule</span>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-zinc-500 hidden sm:inline-block">
               {session.user.email}
@@ -85,7 +89,7 @@ export default function App() {
             <button
               onClick={() => supabase.auth.signOut()}
               className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-md transition-colors"
-              title="Sign out"
+              title={t.signOut}
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -99,29 +103,31 @@ export default function App() {
             onClick={() => setActiveTab('dashboard')}
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-              activeTab === 'dashboard' 
-                ? "border-zinc-900 text-zinc-900" 
+              activeTab === 'dashboard'
+                ? "border-zinc-900 text-zinc-900"
                 : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
             )}
           >
             <LayoutDashboard className="w-4 h-4" />
-            Dashboard
+            {t.dashboard}
           </button>
           <button
             onClick={() => setActiveTab('booking')}
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-              activeTab === 'booking' 
-                ? "border-zinc-900 text-zinc-900" 
+              activeTab === 'booking'
+                ? "border-zinc-900 text-zinc-900"
                 : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
             )}
           >
             <Calendar className="w-4 h-4" />
-            Book a Desk
+            {t.bookDesk}
           </button>
         </div>
 
-        {activeTab === 'dashboard' ? <Dashboard user={session.user} onBookToday={() => setActiveTab('booking')} /> : <Booking user={session.user} />}
+        {activeTab === 'dashboard'
+          ? <Dashboard user={session.user} onBookToday={() => setActiveTab('booking')} />
+          : <Booking user={session.user} />}
       </main>
       <Toaster position="top-center" />
     </div>

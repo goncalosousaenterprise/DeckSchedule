@@ -1,0 +1,164 @@
+import { de, enUS } from 'date-fns/locale';
+import type { Locale } from 'date-fns';
+
+export type Lang = 'en' | 'de';
+
+export function detectLang(): Lang {
+  if (typeof navigator === 'undefined') return 'en';
+  return navigator.language.startsWith('de') ? 'de' : 'en';
+}
+
+export function getDateLocale(lang: Lang): Locale {
+  return lang === 'de' ? de : enUS;
+}
+
+const translations = {
+  en: {
+    app: {
+      dashboard: 'Dashboard',
+      bookDesk: 'Book a Desk',
+      signOut: 'Sign out',
+      missingDb: 'Missing Database Connection',
+      missingDbText: 'The application cannot connect to Supabase. You need to add your Supabase credentials to the AI Studio environment.',
+      requiredVars: 'Required Environment Variables',
+      missingDbHint: 'Open the Settings / Secrets menu in AI Studio to add these variables, then the app will automatically reload.',
+    },
+    auth: {
+      welcomeBack: 'Welcome back',
+      signInSubtitle: 'Sign in to manage your desk bookings',
+      createAccount: 'Create account',
+      signUpSubtitle: (domain: string) => `Only @${domain} emails allowed`,
+      emailLabel: 'Email',
+      passwordLabel: 'Password',
+      emailPlaceholder: (domain: string) => `name@${domain}`,
+      signInBtn: 'Sign in',
+      signUpBtn: 'Create account',
+      createNew: 'Create new account',
+      alreadyHave: 'Already have an account?',
+      signInLink: 'Sign in',
+      or: 'or',
+      domainError: (domain: string) => `Only @${domain} emails are allowed`,
+      checkEmail: 'Check your email for the confirmation link!',
+      loggedIn: 'Successfully logged in!',
+      authError: 'An error occurred. Please try again.',
+    },
+    dashboard: {
+      title: "Today's Overview",
+      dateFormat: 'EEEE, MMMM d, yyyy',
+      occupancy: 'Office Occupancy',
+      desks: 'desks',
+      capacity: 'capacity',
+      yourStatus: 'Your Status',
+      bookedFor: 'Booked for',
+      allSet: "You're all set for today.",
+      notBooked: 'Not booked',
+      noDesk: "You don't have a desk reserved for today.",
+      bookToday: 'Book a desk for today',
+      peopleToday: 'People in the office today',
+      noOne: 'No one has booked a desk for today yet.',
+      you: 'You',
+    },
+    booking: {
+      title: 'Book a Desk',
+      subtitle: 'Select a date to see available desks.',
+      entireDay: 'Entire Day',
+      morning: 'Morning',
+      afternoon: 'Afternoon',
+      bookedCounter: 'booked',
+      yourDesk: 'Your desk',
+      available: 'Available',
+      cancelBooking: 'Cancel Booking',
+      fullyBooked: 'The office is fully booked for this time.',
+      youHaveBooked: 'You have a desk booked',
+      bookedSuccess: 'Desk booked successfully!',
+      cancelSuccess: 'Booking cancelled',
+      loadError: 'Failed to load desks',
+      bookError: 'Failed to book desk',
+      cancelError: 'Failed to cancel booking',
+      overlapError: (slot: string) => `You already have a booking that overlaps with ${slot}.`,
+      doubleBookError: 'You already have a booking for this day or the desk was just taken.',
+    },
+    timeOfDay: {
+      entire_day: 'entire day',
+      morning: 'morning',
+      afternoon: 'afternoon',
+    },
+  },
+  de: {
+    app: {
+      dashboard: 'Dashboard',
+      bookDesk: 'Schreibtisch buchen',
+      signOut: 'Abmelden',
+      missingDb: 'Datenbankverbindung fehlt',
+      missingDbText: 'Die Anwendung kann keine Verbindung zu Supabase herstellen. Bitte füge die Supabase-Zugangsdaten zur AI Studio-Umgebung hinzu.',
+      requiredVars: 'Erforderliche Umgebungsvariablen',
+      missingDbHint: 'Öffne das Einstellungsmenü in AI Studio, um diese Variablen hinzuzufügen. Die App lädt dann automatisch neu.',
+    },
+    auth: {
+      welcomeBack: 'Willkommen zurück',
+      signInSubtitle: 'Melde dich an, um deine Buchungen zu verwalten',
+      createAccount: 'Konto erstellen',
+      signUpSubtitle: (domain: string) => `Nur @${domain} E-Mails erlaubt`,
+      emailLabel: 'E-Mail',
+      passwordLabel: 'Passwort',
+      emailPlaceholder: (domain: string) => `name@${domain}`,
+      signInBtn: 'Anmelden',
+      signUpBtn: 'Konto erstellen',
+      createNew: 'Neues Konto erstellen',
+      alreadyHave: 'Bereits ein Konto?',
+      signInLink: 'Anmelden',
+      or: 'oder',
+      domainError: (domain: string) => `Nur @${domain} E-Mails sind erlaubt`,
+      checkEmail: 'Bitte überprüfe deine E-Mails für den Bestätigungslink!',
+      loggedIn: 'Erfolgreich angemeldet!',
+      authError: 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.',
+    },
+    dashboard: {
+      title: 'Heutige Übersicht',
+      dateFormat: "EEEE, d. MMMM yyyy",
+      occupancy: 'Büroauslastung',
+      desks: 'Schreibtische',
+      capacity: 'Auslastung',
+      yourStatus: 'Dein Status',
+      bookedFor: 'Gebucht für',
+      allSet: 'Du bist für heute eingetragen.',
+      notBooked: 'Nicht gebucht',
+      noDesk: 'Du hast heute keinen Schreibtisch reserviert.',
+      bookToday: 'Schreibtisch für heute buchen',
+      peopleToday: 'Personen im Büro heute',
+      noOne: 'Heute wurde noch kein Schreibtisch gebucht.',
+      you: 'Du',
+    },
+    booking: {
+      title: 'Schreibtisch buchen',
+      subtitle: 'Wähle ein Datum, um verfügbare Schreibtische zu sehen.',
+      entireDay: 'Ganzer Tag',
+      morning: 'Vormittag',
+      afternoon: 'Nachmittag',
+      bookedCounter: 'gebucht',
+      yourDesk: 'Dein Schreibtisch',
+      available: 'Verfügbar',
+      cancelBooking: 'Buchung stornieren',
+      fullyBooked: 'Das Büro ist für diesen Zeitraum vollständig ausgebucht.',
+      youHaveBooked: 'Du hast einen Schreibtisch gebucht',
+      bookedSuccess: 'Schreibtisch erfolgreich gebucht!',
+      cancelSuccess: 'Buchung storniert',
+      loadError: 'Schreibtische konnten nicht geladen werden',
+      bookError: 'Buchung fehlgeschlagen',
+      cancelError: 'Stornierung fehlgeschlagen',
+      overlapError: (slot: string) => `Du hast bereits eine Buchung, die sich mit ${slot} überschneidet.`,
+      doubleBookError: 'Du hast bereits eine Buchung für diesen Tag oder der Schreibtisch wurde gerade belegt.',
+    },
+    timeOfDay: {
+      entire_day: 'ganzen Tag',
+      morning: 'Vormittag',
+      afternoon: 'Nachmittag',
+    },
+  },
+};
+
+export type Translations = typeof translations.en;
+
+export function getTranslations(lang: Lang): Translations {
+  return translations[lang];
+}
