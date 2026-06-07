@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Loader2, User } from 'lucide-react';
+import { Mail, Lock, Loader2, User, Monitor } from 'lucide-react';
+
+const ALLOWED_DOMAIN = 'cobus-industries.com';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
@@ -13,31 +15,32 @@ export function Auth() {
   const handleAuth = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       if (isSignUp) {
+        if (!email.toLowerCase().endsWith(`@${ALLOWED_DOMAIN}`)) {
+          toast.error(`Só são permitidos emails @${ALLOWED_DOMAIN}`);
+          setLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: {
-              full_name: name,
-            }
+            data: { full_name: name }
           }
         });
         if (error) throw error;
-        toast.success('Check your email for the confirmation link!');
+        toast.success('Verifica o teu email para confirmar a conta!');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success('Successfully logged in!');
+        toast.success('Sessão iniciada!');
       }
     } catch (error: any) {
       console.error('Auth error:', error);
-      toast.error(error?.message || error?.error_description || 'An error occurred during authentication');
+      toast.error(error?.message || error?.error_description || 'Ocorreu um erro. Tenta novamente.');
     } finally {
       setLoading(false);
     }
@@ -47,28 +50,31 @@ export function Auth() {
     <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
       <div className="text-center mb-8">
         <div className="w-12 h-12 bg-zinc-900 rounded-xl mx-auto flex items-center justify-center mb-4">
-          <span className="text-white font-bold text-xl">DB</span>
+          <Monitor className="w-6 h-6 text-white" />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          {isSignUp ? 'Create an account' : 'Welcome back'}
+          {isSignUp ? 'Criar conta' : 'Bem-vindo de volta'}
         </h1>
         <p className="text-sm text-zinc-500 mt-2">
-          {isSignUp ? 'Sign up to start booking desks' : 'Sign in to manage your desk bookings'}
+          {isSignUp
+            ? `Apenas emails @${ALLOWED_DOMAIN}`
+            : 'Inicia sessão para gerir as tuas reservas'}
         </p>
       </div>
 
       <form onSubmit={handleAuth} className="space-y-4">
         {isSignUp && (
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Full Name</label>
+            <label htmlFor="name" className="block text-sm font-medium text-zinc-700 mb-1">Nome completo</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
               <input
+                id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all"
-                placeholder="John Doe"
+                placeholder="João Silva"
                 required={isSignUp}
               />
             </div>
@@ -76,25 +82,27 @@ export function Auth() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
+          <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
             <input
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all"
-              placeholder="you@company.com"
+              placeholder={`nome@${ALLOWED_DOMAIN}`}
               required
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-zinc-700 mb-1">Password</label>
+          <label htmlFor="password" className="block text-sm font-medium text-zinc-700 mb-1">Password</label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -111,17 +119,36 @@ export function Auth() {
           className="w-full bg-zinc-900 text-white py-2.5 rounded-lg font-medium hover:bg-zinc-800 focus:ring-4 focus:ring-zinc-900/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isSignUp ? 'Sign Up' : 'Sign In'}
+          {isSignUp ? 'Criar conta' : 'Entrar'}
         </button>
       </form>
 
-      <div className="mt-6 text-center">
-        <button
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
-        >
-          {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-        </button>
+      <div className="mt-6">
+        {isSignUp ? (
+          <div className="text-center">
+            <span className="text-sm text-zinc-500">Já tens conta? </span>
+            <button
+              onClick={() => setIsSignUp(false)}
+              className="text-sm font-medium text-zinc-900 hover:underline transition-colors"
+            >
+              Iniciar sessão
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="relative flex items-center">
+              <div className="flex-grow border-t border-zinc-200"></div>
+              <span className="mx-3 text-xs text-zinc-400 shrink-0">ou</span>
+              <div className="flex-grow border-t border-zinc-200"></div>
+            </div>
+            <button
+              onClick={() => setIsSignUp(true)}
+              className="w-full py-2.5 rounded-lg border-2 border-zinc-200 text-zinc-700 text-sm font-medium hover:border-zinc-900 hover:text-zinc-900 transition-all"
+            >
+              Criar nova conta
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
