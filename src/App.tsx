@@ -9,7 +9,7 @@ import { Toaster } from 'react-hot-toast';
 import { Auth } from './components/Auth';
 import { Dashboard } from './components/Dashboard';
 import { Booking } from './components/Booking';
-import { Calendar, LayoutDashboard, LogOut, AlertCircle } from 'lucide-react';
+import { Calendar, LayoutDashboard, LogOut, AlertCircle, Monitor } from 'lucide-react';
 import { cn } from './lib/utils';
 
 export default function App() {
@@ -73,9 +73,9 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center">
-              <span className="text-white font-semibold text-sm">DB</span>
+              <Monitor className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-lg tracking-tight">Desk Booking</span>
+            <span className="font-semibold text-lg tracking-tight">DeskSchedule</span>
           </div>
           
           <div className="flex items-center gap-4">
@@ -121,7 +121,7 @@ export default function App() {
           </button>
         </div>
 
-        {activeTab === 'dashboard' ? <Dashboard user={session.user} /> : <Booking user={session.user} />}
+        {activeTab === 'dashboard' ? <Dashboard user={session.user} onBookToday={() => setActiveTab('booking')} /> : <Booking user={session.user} />}
       </main>
       <Toaster position="top-center" />
     </div>

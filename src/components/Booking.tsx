@@ -5,6 +5,16 @@ import { Calendar as CalendarIcon, Loader2, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 
+function getInitials(email: string): string {
+  const local = email.split('@')[0];
+  const parts = local.split('.');
+  const first = parts[0]?.[0]?.toUpperCase() ?? '';
+  if (parts.length >= 2) {
+    return first + (parts[1][0]?.toUpperCase() ?? '');
+  }
+  return first + (parts[0]?.[1]?.toUpperCase() ?? first);
+}
+
 export function Booking({ user }: { user: any }) {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
@@ -14,8 +24,8 @@ export function Booking({ user }: { user: any }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<'entire_day' | 'morning' | 'afternoon'>('entire_day');
 
-  // Generate next 14 days
-  const dates = Array.from({ length: 14 }).map((_, i) => addDays(startOfDay(new Date()), i));
+  // Generate next 4 weeks
+  const dates = Array.from({ length: 28 }).map((_, i) => addDays(startOfDay(new Date()), i));
 
   useEffect(() => {
     fetchDesksAndBookings();
@@ -105,7 +115,7 @@ export function Booking({ user }: { user: any }) {
             date: dateStr,
             status: 'booked',
             time_of_day: timeOfDay,
-            user_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown'
+            user_name: getInitials(user.email || '')
           }
         ]);
 
@@ -245,8 +255,12 @@ export function Booking({ user }: { user: any }) {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+          <div className="p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="h-32 rounded-xl border-2 border-zinc-100 bg-zinc-50 animate-pulse"></div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="p-6">
