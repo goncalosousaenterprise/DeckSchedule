@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Loader2, User, Monitor } from 'lucide-react';
+import { Mail, Lock, Loader2, Monitor } from 'lucide-react';
 
 const ALLOWED_DOMAIN = 'cobus-industries.com';
 
@@ -9,7 +9,6 @@ export function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
 
   const handleAuth = async (e: FormEvent) => {
@@ -27,9 +26,6 @@ export function Auth() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: { full_name: name }
-          }
         });
         if (error) throw error;
         toast.success('Verifica o teu email para confirmar a conta!');
@@ -63,24 +59,6 @@ export function Auth() {
       </div>
 
       <form onSubmit={handleAuth} className="space-y-4">
-        {isSignUp && (
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-700 mb-1">Nome completo</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all"
-                placeholder="João Silva"
-                required={isSignUp}
-              />
-            </div>
-          </div>
-        )}
-
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
           <div className="relative">
