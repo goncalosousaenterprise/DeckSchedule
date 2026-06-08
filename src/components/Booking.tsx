@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { format, addDays, startOfDay, isSameDay, getDay } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Check, X, Users, Lock } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, X, Users, Lock, Sun, Sunrise, Sunset } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { detectLang, getTranslations, getDateLocale } from '../lib/i18n';
@@ -33,7 +33,7 @@ export function Booking({ user }: { user: any }) {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [desks, setDesks] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
-  const [userBookedDates, setUserBookedDates] = useState<string[]>([]);
+  const [userBookings, setUserBookings] = useState<{ date: string; time_of_day: string }[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<'entire_day' | 'morning' | 'afternoon'>('entire_day');
 
@@ -59,12 +59,12 @@ export function Booking({ user }: { user: any }) {
       const endDate = format(dates[dates.length - 1], 'yyyy-MM-dd');
       const { data, error } = await supabase
         .from('bookings')
-        .select('date')
+        .select('date, time_of_day')
         .eq('user_id', user.id)
         .gte('date', startDate)
         .lte('date', endDate);
       if (error) throw error;
-      if (data) setUserBookedDates(data.map(b => b.date));
+      if (data) setUserBookings(data);
     } catch (error) {
       console.error('Error fetching user bookings:', error);
     }
@@ -202,7 +202,12 @@ export function Booking({ user }: { user: any }) {
             const isSelected = isSameDay(date, selectedDate);
             const isToday = isSameDay(date, new Date());
             const isWeekend = getDay(date) === 0 || getDay(date) === 6;
-            const hasBooking = userBookedDates.includes(format(date, 'yyyy-MM-dd'));
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const bookingsForDate = userBookings.filter(b => b.date === dateStr);
+            const isEntireDay = bookingsForDate.some(b => b.time_of_day === 'entire_day');
+            const hasMorning = bookingsForDate.some(b => b.time_of_day === 'morning');
+            const hasAfternoon = bookingsForDate.some(b => b.time_of_day === 'afternoon');
+            const hasBoth = hasMorning && hasAfternoon;
 
             return (
               <button
@@ -234,10 +239,34 @@ export function Booking({ user }: { user: any }) {
                     )}
                   ></span>
                 )}
-                {hasBooking && (
+                {/* Entire day */}
+                {isEntireDay && (
                   <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
-                    <Check className="w-3 h-3" />
+                    <Sun className="w-3 h-3" />
                   </div>
+                )}
+                {/* Morning only */}
+                {!isEntireDay && hasMorning && !hasAfternoon && (
+                  <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
+                    <Sunrise className="w-3 h-3" />
+                  </div>
+                )}
+                {/* Afternoon only */}
+                {!isEntireDay && !hasMorning && hasAfternoon && (
+                  <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
+                    <Sunset className="w-3 h-3" />
+                  </div>
+                )}
+                {/* Morning + afternoon → two badges */}
+                {!isEntireDay && hasBoth && (
+                  <>
+                    <div className="absolute -bottom-1.5 -left-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
+                      <Sunrise className="w-3 h-3" />
+                    </div>
+                    <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
+                      <Sunset className="w-3 h-3" />
+                    </div>
+                  </>
                 )}
               </button>
             );
@@ -314,7 +343,7 @@ export function Booking({ user }: { user: any }) {
               /* Show counter + book button */
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <p className={cn(
-                  'text-5xl font-bold tracking-tight',
+                  'text-2xl font-bold tracking-tight',
                   availableCount === 0 ? 'text-zinc-300' : 'text-zinc-900'
                 )}>
                   {t.spotsAvailable(availableCount, totalOpen)}
