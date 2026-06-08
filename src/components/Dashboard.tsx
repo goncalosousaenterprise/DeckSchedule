@@ -35,7 +35,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
 
       const { data: todayBookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('id, user_id, desk_id, status, user_name, time_of_day, desks (name)')
+        .select('id, user_id, desk_id, status, user_name, time_of_day')
         .eq('date', today);
       if (bookingsError) throw bookingsError;
 
@@ -76,7 +76,6 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                   <div className="h-4 w-28 bg-zinc-100 rounded animate-pulse"></div>
                   <div className="h-3 w-16 bg-zinc-100 rounded animate-pulse"></div>
                 </div>
-                <div className="h-6 w-20 bg-zinc-100 rounded-full animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -133,9 +132,6 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     {t.bookedFor} <span className="capitalize">{formatTimeOfDay(booking.time_of_day)}</span>
                   </div>
-                  <p className="text-zinc-900 font-medium mb-1">
-                    Desk: {booking.desks?.name}
-                  </p>
                   <p className="text-sm text-zinc-500">{t.allSet}</p>
                 </div>
               ))}
@@ -172,22 +168,17 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
             <ul className="divide-y divide-zinc-100">
               {bookings.map((booking) => (
-                <li key={booking.id} className="p-4 flex items-center justify-between hover:bg-zinc-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium">
-                      {(booking.user_name || booking.user_id).substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-zinc-900">
-                        {booking.user_id === user.id ? t.you : (booking.user_name || `User ${booking.user_id.substring(0, 6)}`)}
-                      </p>
-                      <p className="text-sm text-zinc-500 capitalize">
-                        {formatTimeOfDay(booking.time_of_day)}
-                      </p>
-                    </div>
+                <li key={booking.id} className="p-4 flex items-center gap-3 hover:bg-zinc-50 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium shrink-0">
+                    {(booking.user_name || booking.user_id).substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="text-sm font-medium text-zinc-900 bg-zinc-100 px-3 py-1 rounded-full">
-                    {booking.desks?.name}
+                  <div>
+                    <p className="font-medium text-zinc-900">
+                      {booking.user_id === user.id ? t.you : (booking.user_name || `User ${booking.user_id.substring(0, 6)}`)}
+                    </p>
+                    <p className="text-sm text-zinc-500 capitalize">
+                      {formatTimeOfDay(booking.time_of_day)}
+                    </p>
                   </div>
                 </li>
               ))}
