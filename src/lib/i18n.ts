@@ -87,6 +87,7 @@ const translations = {
       occupied: 'Occupied',
       bookOffice: 'Book office',
       cancelOffice: 'Cancel office',
+      crossTypeError: "You can't book an open workspace and the private office on the same day.",
     },
     timeOfDay: {
       entire_day: 'entire day',
@@ -168,6 +169,7 @@ const translations = {
       occupied: 'Belegt',
       bookOffice: 'Büro buchen',
       cancelOffice: 'Büro stornieren',
+      crossTypeError: 'Du kannst nicht gleichzeitig einen offenen Arbeitsplatz und das private Büro am selben Tag buchen.',
     },
     timeOfDay: {
       entire_day: 'ganzen Tag',

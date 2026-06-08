@@ -114,6 +114,17 @@ export function Booking({ user }: { user: any }) {
         return;
       }
 
+      const targetType = desks.find(d => d.id === deskId)?.type;
+      const hasCrossType = myBookingsToday.some(b => {
+        const bookedType = desks.find(d => d.id === b.desk_id)?.type;
+        return targetType === 'private' ? bookedType !== 'private' : bookedType === 'private';
+      });
+      if (hasCrossType) {
+        toast.error(t.crossTypeError);
+        setActionLoading(null);
+        return;
+      }
+
       const { error } = await supabase.from('bookings').insert([
         {
           user_id: user.id,
