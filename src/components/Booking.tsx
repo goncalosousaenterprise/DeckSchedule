@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { format, addDays, startOfDay, isSameDay } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Check, X } from 'lucide-react';
+import { format, addDays, startOfDay, isSameDay, getDay } from 'date-fns';
+import { Calendar as CalendarIcon, Loader2, Check, X, Users, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { detectLang, getTranslations, getDateLocale } from '../lib/i18n';
@@ -18,6 +18,14 @@ function getInitials(email: string): string {
     return first + (parts[1][0]?.toUpperCase() ?? '');
   }
   return first + (parts[0]?.[1]?.toUpperCase() ?? first);
+}
+
+function getOverlapping(deskId: string, bookings: any[], timeOfDay: string) {
+  return bookings.filter(
+    b =>
+      b.desk_id === deskId &&
+      (b.time_of_day === 'entire_day' || timeOfDay === 'entire_day' || b.time_of_day === timeOfDay)
+  );
 }
 
 export function Booking({ user }: { user: any }) {
@@ -49,14 +57,12 @@ export function Booking({ user }: { user: any }) {
     try {
       const startDate = format(dates[0], 'yyyy-MM-dd');
       const endDate = format(dates[dates.length - 1], 'yyyy-MM-dd');
-
       const { data, error } = await supabase
         .from('bookings')
         .select('date')
         .eq('user_id', user.id)
         .gte('date', startDate)
         .lte('date', endDate);
-
       if (error) throw error;
       if (data) setUserBookedDates(data.map(b => b.date));
     } catch (error) {
@@ -68,7 +74,6 @@ export function Booking({ user }: { user: any }) {
     try {
       setLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-
       const { data: desksData, error: desksError } = await supabase
         .from('desks')
         .select('*')
@@ -97,12 +102,11 @@ export function Booking({ user }: { user: any }) {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       const myBookingsToday = bookings.filter(b => b.user_id === user.id);
-      const hasOverlap = myBookingsToday.some(b =>
-        b.time_of_day === 'entire_day' ||
-        timeOfDay === 'entire_day' ||
-        b.time_of_day === timeOfDay
+      const hasOverlap = myBookingsToday.some(
+        b =>
+          b.desk_id === deskId &&
+          (b.time_of_day === 'entire_day' || timeOfDay === 'entire_day' || b.time_of_day === timeOfDay)
       );
-
       if (hasOverlap) {
         const slotLabel = timeOptions.find(o => o.id === timeOfDay)?.label ?? timeOfDay;
         toast.error(t.overlapError(slotLabel));
@@ -110,16 +114,16 @@ export function Booking({ user }: { user: any }) {
         return;
       }
 
-      const { error } = await supabase
-        .from('bookings')
-        .insert([{
+      const { error } = await supabase.from('bookings').insert([
+        {
           user_id: user.id,
           desk_id: deskId,
           date: dateStr,
           status: 'booked',
           time_of_day: timeOfDay,
           user_name: getInitials(user.email || ''),
-        }]);
+        },
+      ]);
 
       if (error) {
         if (error.code === '23505') {
@@ -148,9 +152,7 @@ export function Booking({ user }: { user: any }) {
         .delete()
         .eq('id', bookingId)
         .eq('user_id', user.id);
-
       if (error) throw error;
-
       toast.success(t.cancelSuccess);
       fetchDesksAndBookings();
       fetchUserBookings();
@@ -162,16 +164,29 @@ export function Booking({ user }: { user: any }) {
     }
   };
 
-  const myBookingsToday = bookings.filter(b => b.user_id === user.id);
+  // Derived state
+  const openDesks = desks.filter(d => d.type !== 'private');
+  const privateOffice = desks.find(d => d.type === 'private') ?? null;
 
-  const isFullyBooked = desks.length > 0 && desks.every(desk => {
-    const deskBookings = bookings.filter(b => b.desk_id === desk.id);
-    return deskBookings.some(b =>
-      b.time_of_day === 'entire_day' ||
-      timeOfDay === 'entire_day' ||
-      b.time_of_day === timeOfDay
-    );
-  });
+  const availableOpenDesks = openDesks.filter(d => getOverlapping(d.id, bookings, timeOfDay).length === 0);
+  const availableCount = availableOpenDesks.length;
+  const totalOpen = openDesks.length;
+
+  const myOpenBooking = bookings.find(
+    b => b.user_id === user.id && openDesks.some(d => d.id === b.desk_id) &&
+      (b.time_of_day === 'entire_day' || timeOfDay === 'entire_day' || b.time_of_day === timeOfDay)
+  );
+
+  const privateOverlapping = privateOffice ? getOverlapping(privateOffice.id, bookings, timeOfDay) : [];
+  const isPrivateBooked = privateOverlapping.length > 0;
+  const myPrivateBooking = privateOverlapping.find(b => b.user_id === user.id);
+
+  const handleBookSpot = () => {
+    const first = availableOpenDesks[0];
+    if (first) handleBookDesk(first.id);
+  };
+
+  const isAnyActionLoading = actionLoading !== null;
 
   return (
     <div className="space-y-8">
@@ -181,11 +196,12 @@ export function Booking({ user }: { user: any }) {
       </div>
 
       {/* Date Selector */}
-      <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto mb-6">
+      <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm overflow-x-auto">
         <div className="flex gap-2 min-w-max">
           {dates.map((date) => {
             const isSelected = isSameDay(date, selectedDate);
             const isToday = isSameDay(date, new Date());
+            const isWeekend = getDay(date) === 0 || getDay(date) === 6;
             const hasBooking = userBookedDates.includes(format(date, 'yyyy-MM-dd'));
 
             return (
@@ -193,20 +209,30 @@ export function Booking({ user }: { user: any }) {
                 key={date.toISOString()}
                 onClick={() => setSelectedDate(date)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center w-16 h-20 rounded-xl transition-all shrink-0",
+                  'relative flex flex-col items-center justify-center w-16 h-20 rounded-xl transition-all shrink-0',
                   isSelected
-                    ? "bg-zinc-900 text-white shadow-md"
-                    : "bg-zinc-50 text-zinc-600 hover:bg-zinc-100 border border-zinc-200"
+                    ? 'bg-zinc-900 text-white shadow-md'
+                    : isWeekend
+                    ? 'bg-zinc-50 text-zinc-400 hover:bg-zinc-100 border border-zinc-100'
+                    : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 border border-zinc-200'
                 )}
               >
-                <span className={cn("text-xs font-medium uppercase tracking-wider mb-1", isSelected ? "text-zinc-300" : "text-zinc-500")}>
+                <span
+                  className={cn(
+                    'text-xs font-medium uppercase tracking-wider mb-1',
+                    isSelected ? 'text-zinc-300' : isWeekend ? 'text-zinc-300' : 'text-zinc-500'
+                  )}
+                >
                   {format(date, 'EEE', { locale: dateLocale })}
                 </span>
-                <span className="text-xl font-semibold">
-                  {format(date, 'd')}
-                </span>
+                <span className="text-xl font-semibold">{format(date, 'd')}</span>
                 {isToday && (
-                  <span className={cn("w-1 h-1 rounded-full mt-1", isSelected ? "bg-white" : "bg-zinc-900")}></span>
+                  <span
+                    className={cn(
+                      'w-1 h-1 rounded-full mt-1',
+                      isSelected ? 'bg-white' : isWeekend ? 'bg-zinc-300' : 'bg-zinc-900'
+                    )}
+                  ></span>
                 )}
                 {hasBooking && (
                   <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm border-2 border-white">
@@ -220,16 +246,16 @@ export function Booking({ user }: { user: any }) {
       </div>
 
       {/* Time of Day Selector */}
-      <div className="flex bg-zinc-100 p-1 rounded-xl w-full max-w-md mb-6">
+      <div className="flex bg-zinc-100 p-1 rounded-xl w-full max-w-md">
         {timeOptions.map((option) => (
           <button
             key={option.id}
             onClick={() => setTimeOfDay(option.id)}
             className={cn(
-              "flex-1 py-2 text-sm font-medium rounded-lg transition-all",
+              'flex-1 py-2 text-sm font-medium rounded-lg transition-all',
               timeOfDay === option.id
-                ? "bg-white text-zinc-900 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-700"
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700'
             )}
           >
             {option.label}
@@ -237,123 +263,139 @@ export function Booking({ user }: { user: any }) {
         ))}
       </div>
 
-      {/* Main Content */}
-      <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CalendarIcon className="w-5 h-5 text-zinc-400" />
-            <h3 className="font-semibold text-lg">
-              {format(selectedDate, 'EEEE, MMMM d', { locale: dateLocale })}
-            </h3>
-          </div>
-          <div className="text-sm font-medium text-zinc-500 bg-zinc-100 px-3 py-1 rounded-full">
-            {bookings.length} / {desks.length} {t.bookedCounter}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="h-32 rounded-xl border-2 border-zinc-100 bg-zinc-50 animate-pulse"></div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="p-6">
-            {myBookingsToday.length > 0 ? (
-              <div className="space-y-3 mb-8">
-                {myBookingsToday.map(booking => (
-                  <div key={booking.id} className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 text-emerald-700 font-medium mb-1">
-                        <Check className="w-5 h-5" />
-                        {t.youHaveBooked} <span className="capitalize">({timeOptions.find(o => o.id === booking.time_of_day)?.label ?? booking.time_of_day?.replace('_', ' ')})</span>
-                      </div>
-                      <p className="text-emerald-900 text-lg font-semibold">
-                        {desks.find(d => d.id === booking.desk_id)?.name}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleCancelBooking(booking.id)}
-                      disabled={actionLoading === booking.id}
-                      className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg font-medium hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {actionLoading === booking.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <X className="w-4 h-4" />
-                      )}
-                      {t.cancelBooking}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : isFullyBooked ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center mb-8">
-                <p className="text-amber-800 font-medium">{t.fullyBooked}</p>
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {desks.map((desk) => {
-                const deskBookings = bookings.filter(b => b.desk_id === desk.id);
-                const overlappingBookings = deskBookings.filter(b =>
-                  b.time_of_day === 'entire_day' ||
-                  timeOfDay === 'entire_day' ||
-                  b.time_of_day === timeOfDay
-                );
-                const isBooked = overlappingBookings.length > 0;
-                const myOverlappingBooking = overlappingBookings.find(b => b.user_id === user.id);
-                const isMyBooking = !!myOverlappingBooking;
-                const displayBooking = myOverlappingBooking || overlappingBookings[0];
-
-                return (
-                  <div
-                    key={desk.id}
-                    className={cn(
-                      "relative p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-3 h-32",
-                      isMyBooking
-                        ? "border-emerald-500 bg-emerald-50"
-                        : isBooked
-                        ? "border-zinc-200 bg-zinc-50 opacity-60"
-                        : "border-zinc-200 bg-white hover:border-zinc-900 cursor-pointer"
-                    )}
-                    onClick={() => {
-                      if (!isBooked && !myBookingsToday.some(b => b.time_of_day === 'entire_day' || timeOfDay === 'entire_day' || b.time_of_day === timeOfDay)) {
-                        handleBookDesk(desk.id);
-                      }
-                    }}
-                  >
-                    <div className={cn(
-                      "w-12 h-12 rounded-lg flex items-center justify-center font-semibold text-lg",
-                      isMyBooking ? "bg-emerald-100 text-emerald-700" :
-                      isBooked ? "bg-zinc-200 text-zinc-500" : "bg-zinc-100 text-zinc-900"
-                    )}>
-                      {desk.name.replace('Desk ', '')}
-                    </div>
-
-                    <div className="text-center">
-                      <p className={cn("font-medium text-sm", isBooked ? "text-zinc-500" : "text-zinc-900")}>
-                        {desk.name}
-                      </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        {isMyBooking ? t.yourDesk : isBooked ? (displayBooking?.user_name || t.bookedCounter) : t.available}
-                      </p>
-                    </div>
-
-                    {actionLoading === desk.id && (
-                      <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                        <Loader2 className="w-6 h-6 animate-spin text-zinc-900" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+      {/* Date header */}
+      <div className="flex items-center gap-3 pb-2 border-b border-zinc-100">
+        <CalendarIcon className="w-5 h-5 text-zinc-400" />
+        <h3 className="font-semibold text-lg">
+          {format(selectedDate, 'EEEE, MMMM d', { locale: dateLocale })}
+        </h3>
       </div>
+
+      {loading ? (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-zinc-200 h-44 animate-pulse"></div>
+          <div className="bg-white rounded-2xl border border-zinc-200 h-32 animate-pulse"></div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Open Workspaces */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Users className="w-5 h-5 text-zinc-400" />
+              <h4 className="font-semibold text-zinc-900">{t.openWorkspaces}</h4>
+            </div>
+
+            {myOpenBooking ? (
+              /* User already has a spot — show status + cancel */
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium mb-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {t.youHaveSpot}
+                  </div>
+                  <p className="text-sm text-zinc-500 capitalize">
+                    {timeOptions.find(o => o.id === myOpenBooking.time_of_day)?.label ?? myOpenBooking.time_of_day?.replace('_', ' ')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleCancelBooking(myOpenBooking.id)}
+                  disabled={isAnyActionLoading}
+                  className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {actionLoading === myOpenBooking.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <X className="w-4 h-4" />
+                  )}
+                  {t.cancelSpot}
+                </button>
+              </div>
+            ) : (
+              /* Show counter + book button */
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <p className={cn(
+                  'text-5xl font-bold tracking-tight',
+                  availableCount === 0 ? 'text-zinc-300' : 'text-zinc-900'
+                )}>
+                  {t.spotsAvailable(availableCount, totalOpen)}
+                </p>
+                {availableCount > 0 ? (
+                  <button
+                    onClick={handleBookSpot}
+                    disabled={isAnyActionLoading}
+                    className="shrink-0 px-6 py-2.5 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {t.bookSpot}
+                  </button>
+                ) : (
+                  <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg shrink-0">
+                    {t.noSpotsAvailable}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Private Office */}
+          {privateOffice && (
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Lock className="w-5 h-5 text-zinc-400" />
+                <h4 className="font-semibold text-zinc-900">{t.privateOfficeLabel}</h4>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-full',
+                      myPrivateBooking
+                        ? 'bg-emerald-500'
+                        : isPrivateBooked
+                        ? 'bg-red-400'
+                        : 'bg-emerald-500'
+                    )}
+                  ></span>
+                  <span className="text-sm font-medium text-zinc-700">
+                    {myPrivateBooking
+                      ? t.youHaveSpot
+                      : isPrivateBooked
+                      ? t.occupied
+                      : t.available}
+                  </span>
+                </div>
+
+                {myPrivateBooking ? (
+                  <button
+                    onClick={() => handleCancelBooking(myPrivateBooking.id)}
+                    disabled={isAnyActionLoading}
+                    className="px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {actionLoading === myPrivateBooking.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                    {t.cancelOffice}
+                  </button>
+                ) : !isPrivateBooked ? (
+                  <button
+                    onClick={() => handleBookDesk(privateOffice.id)}
+                    disabled={isAnyActionLoading}
+                    className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {actionLoading === privateOffice.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : null}
+                    {t.bookOffice}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

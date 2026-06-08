@@ -4,6 +4,7 @@
 CREATE TABLE desks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL DEFAULT 'open',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -56,7 +57,8 @@ TO authenticated
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
--- 6. Insert some initial desks
-INSERT INTO desks (name) VALUES 
-  ('Desk 1'), ('Desk 2'), ('Desk 3'), ('Desk 4'), ('Desk 5'),
-  ('Desk 6'), ('Desk 7'), ('Desk 8'), ('Desk 9'), ('Desk 10');
+-- 6. Insert initial desks
+INSERT INTO desks (name, type) VALUES
+  ('Desk 1', 'open'), ('Desk 2', 'open'), ('Desk 3', 'open'), ('Desk 4', 'open'), ('Desk 5', 'open'),
+  ('Desk 6', 'open'), ('Desk 7', 'open'), ('Desk 8', 'open'), ('Desk 9', 'open'), ('Desk 10', 'open'),
+  ('Private Office', 'private');
