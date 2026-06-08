@@ -88,6 +88,7 @@ const translations = {
       bookOffice: 'Book office',
       cancelOffice: 'Cancel office',
       crossTypeError: "You can't book an open workspace and the private office on the same day.",
+      mergedToEntireDay: 'Merged into an entire day booking!',
     },
     timeOfDay: {
       entire_day: 'entire day',
@@ -170,6 +171,7 @@ const translations = {
       bookOffice: 'Büro buchen',
       cancelOffice: 'Büro stornieren',
       crossTypeError: 'Du kannst nicht gleichzeitig einen offenen Arbeitsplatz und das private Büro am selben Tag buchen.',
+      mergedToEntireDay: 'Als ganzen Tag zusammengeführt!',
     },
     timeOfDay: {
       entire_day: 'ganzen Tag',

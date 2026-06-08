@@ -143,7 +143,41 @@ export function Booking({ user }: { user: any }) {
           throw error;
         }
       } else {
-        toast.success(t.bookedSuccess);
+        // Check if morning + afternoon should merge into entire_day
+        const myExistingOpen = bookings.filter(
+          b => b.user_id === user.id && openDesks.some(d => d.id === b.desk_id)
+        );
+        const needsMerge =
+          (timeOfDay === 'afternoon' && myExistingOpen.some(b => b.time_of_day === 'morning')) ||
+          (timeOfDay === 'morning' && myExistingOpen.some(b => b.time_of_day === 'afternoon'));
+
+        if (needsMerge) {
+          const { data: freshBookings } = await supabase
+            .from('bookings')
+            .select('id, desk_id, time_of_day')
+            .eq('date', dateStr)
+            .eq('user_id', user.id);
+
+          const morningB = freshBookings?.find(b => b.time_of_day === 'morning');
+          const afternoonB = freshBookings?.find(b => b.time_of_day === 'afternoon');
+
+          if (morningB && afternoonB) {
+            await supabase.from('bookings').delete().in('id', [morningB.id, afternoonB.id]);
+            await supabase.from('bookings').insert([{
+              user_id: user.id,
+              desk_id: morningB.desk_id,
+              date: dateStr,
+              status: 'booked',
+              time_of_day: 'entire_day',
+              user_name: getInitials(user.email || ''),
+            }]);
+            toast.success(t.mergedToEntireDay);
+          } else {
+            toast.success(t.bookedSuccess);
+          }
+        } else {
+          toast.success(t.bookedSuccess);
+        }
         fetchDesksAndBookings();
         fetchUserBookings();
       }
