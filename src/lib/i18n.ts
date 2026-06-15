@@ -57,6 +57,7 @@ const translations = {
       peopleToday: 'People in the office today',
       noOne: 'No one has booked a desk for today yet.',
       you: 'You',
+      monthlyOccupancy: 'Monthly Occupancy',
     },
     booking: {
       title: 'Book a Desk',
@@ -83,7 +84,7 @@ const translations = {
       noSpotsAvailable: 'No spots available for this period',
       youHaveSpot: 'You have a spot booked',
       cancelSpot: 'Cancel spot',
-      privateOfficeLabel: 'Private Office',
+      privateOfficeLabel: 'Office MK',
       occupied: 'Occupied',
       bookOffice: 'Book office',
       cancelOffice: 'Cancel office',
@@ -140,6 +141,7 @@ const translations = {
       peopleToday: 'Personen im Büro heute',
       noOne: 'Heute wurde noch kein Schreibtisch gebucht.',
       you: 'Du',
+      monthlyOccupancy: 'Monatliche Auslastung',
     },
     booking: {
       title: 'Schreibtisch buchen',
@@ -166,7 +168,7 @@ const translations = {
       noSpotsAvailable: 'Keine Plätze für diesen Zeitraum verfügbar',
       youHaveSpot: 'Du hast einen Platz gebucht',
       cancelSpot: 'Platz stornieren',
-      privateOfficeLabel: 'Privates Büro',
+      privateOfficeLabel: 'Büro MK',
       occupied: 'Belegt',
       bookOffice: 'Büro buchen',
       cancelOffice: 'Büro stornieren',

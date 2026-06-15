@@ -210,6 +210,13 @@ export function Booking({ user }: { user: any }) {
   };
 
   // Derived state
+  const peopleToday = bookings
+    .filter((b, i, arr) => arr.findIndex(x => x.user_id === b.user_id) === i)
+    .map(b => ({
+      userId: b.user_id,
+      initials: ((b.user_name || b.user_id.substring(0, 2)) as string).toUpperCase().substring(0, 2),
+    }));
+
   const openDesks = desks.filter(d => d.type !== 'private');
   const privateOffice = desks.find(d => d.type === 'private') ?? null;
 
@@ -318,6 +325,29 @@ export function Booking({ user }: { user: any }) {
           })}
         </div>
       </div>
+
+      {/* Who's booked on selected day */}
+      {!loading && peopleToday.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {peopleToday.map(p => (
+            <div
+              key={p.userId}
+              title={p.initials}
+              className={cn(
+                'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0',
+                p.userId === user.id
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-zinc-100 text-zinc-600'
+              )}
+            >
+              {p.initials}
+            </div>
+          ))}
+          <span className="text-sm text-zinc-400">
+            {peopleToday.length} {t.bookedCounter}
+          </span>
+        </div>
+      )}
 
       {/* Time of Day Selector */}
       <div className="flex bg-zinc-100 p-1 rounded-xl w-full max-w-md">
