@@ -58,6 +58,7 @@ const translations = {
       noOne: 'No one has booked a desk for today yet.',
       you: 'You',
       monthlyOccupancy: 'Monthly Occupancy',
+      avgOccupancy: 'Avg. occupancy (weekdays)',
     },
     booking: {
       title: 'Book a Desk',
@@ -142,6 +143,7 @@ const translations = {
       noOne: 'Heute wurde noch kein Schreibtisch gebucht.',
       you: 'Du',
       monthlyOccupancy: 'Monatliche Auslastung',
+      avgOccupancy: 'Ø Auslastung (Werktage)',
     },
     booking: {
       title: 'Schreibtisch buchen',

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
-import { Users, CheckCircle2, Calendar } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from 'date-fns';
+import { Users, CheckCircle2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { detectLang, getTranslations, getDateLocale } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
@@ -15,15 +15,25 @@ function formatTimeOfDay(value: string | undefined): string {
   return tTime[value as keyof typeof tTime] ?? value.replace('_', ' ');
 }
 
+function occupancyStyle(pct: number): React.CSSProperties {
+  // Continuous white → blue-500 scale
+  const alpha = pct / 100;
+  return {
+    backgroundColor: `rgba(59, 130, 246, ${alpha})`,
+    color: pct >= 55 ? 'white' : pct > 0 ? 'rgb(29, 78, 216)' : 'rgb(212, 212, 216)',
+  };
+}
+
 export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () => void }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalDesks: 0, bookedDesks: 0 });
   const [bookings, setBookings] = useState<any[]>([]);
+  const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date()));
   const [monthOccupancy, setMonthOccupancy] = useState<Record<string, number>>({});
+  const [monthLoading, setMonthLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  useEffect(() => { fetchDashboardData(); }, []);
+  useEffect(() => { fetchMonthOccupancy(); }, [viewMonth]);
 
   const fetchDashboardData = async () => {
     try {
@@ -31,8 +41,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
       const today = format(new Date(), 'yyyy-MM-dd');
 
       const { data: desks, error: desksError } = await supabase
-        .from('desks')
-        .select('id, name');
+        .from('desks').select('id, name');
       if (desksError) throw desksError;
 
       const { data: todayBookings, error: bookingsError } = await supabase
@@ -44,15 +53,23 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
       const uniqueBookedDesks = new Set(todayBookings?.map(b => b.desk_id)).size;
       setStats({ totalDesks: desks?.length || 0, bookedDesks: uniqueBookedDesks });
       setBookings(todayBookings || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Monthly occupancy
-      const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-      const monthEnd   = format(endOfMonth(new Date()),   'yyyy-MM-dd');
-      const { data: monthData } = await supabase
-        .from('bookings')
-        .select('date, desk_id')
-        .gte('date', monthStart)
-        .lte('date', monthEnd);
+  const fetchMonthOccupancy = async () => {
+    try {
+      setMonthLoading(true);
+      const monthStart = format(startOfMonth(viewMonth), 'yyyy-MM-dd');
+      const monthEnd   = format(endOfMonth(viewMonth),   'yyyy-MM-dd');
+
+      const [{ data: desks }, { data: monthData }] = await Promise.all([
+        supabase.from('desks').select('id'),
+        supabase.from('bookings').select('date, desk_id').gte('date', monthStart).lte('date', monthEnd),
+      ]);
 
       const total = desks?.length ?? 0;
       const occMap: Record<string, Set<string>> = {};
@@ -61,14 +78,16 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
         occMap[b.date].add(b.desk_id);
       });
       const pctMap: Record<string, number> = {};
-      Object.entries(occMap).forEach(([d, s]) => {
-        pctMap[d] = Math.round((s.size / total) * 100);
-      });
+      if (total > 0) {
+        Object.entries(occMap).forEach(([d, s]) => {
+          pctMap[d] = Math.round((s.size / total) * 100);
+        });
+      }
       setMonthOccupancy(pctMap);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching month occupancy:', error);
     } finally {
-      setLoading(false);
+      setMonthLoading(false);
     }
   };
 
@@ -106,7 +125,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
         </div>
         <div className="w-full md:w-72 shrink-0">
           <div className="h-6 w-44 bg-zinc-100 rounded animate-pulse mb-4"></div>
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 h-64 animate-pulse"></div>
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 h-72 animate-pulse"></div>
         </div>
       </div>
     );
@@ -118,8 +137,22 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
 
   const myBookings = bookings.filter(b => b.user_id === user.id);
 
-  const monthDays = eachDayOfInterval({ start: startOfMonth(new Date()), end: endOfMonth(new Date()) });
+  // Calendar
+  const monthDays = eachDayOfInterval({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) });
   const calendarOffset = (getDay(monthDays[0]) + 6) % 7;
+
+  // KPI: average occupancy of past workdays in the viewed month (weekends excluded)
+  const today = new Date();
+  const pastWorkdays = monthDays.filter(d => {
+    const dow = getDay(d);
+    return dow !== 0 && dow !== 6 && d <= today;
+  });
+  const avgOccupancy = pastWorkdays.length > 0
+    ? Math.round(
+        pastWorkdays.reduce((sum, d) => sum + (monthOccupancy[format(d, 'yyyy-MM-dd')] ?? 0), 0)
+        / pastWorkdays.length
+      )
+    : null;
 
   return (
     <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -225,64 +258,75 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
       <div className="w-full md:w-72 shrink-0">
         <h3 className="text-lg font-semibold mb-4">{t.monthlyOccupancy}</h3>
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
-          <p className="text-sm font-medium text-zinc-500 mb-3 text-center">
-            {format(new Date(), 'MMMM yyyy', { locale: dateLocale })}
-          </p>
-
-          {/* Day-of-week headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
-              <div key={d} className="text-center text-xs font-medium text-zinc-400 py-1">{d}</div>
-            ))}
+          {/* Month navigation */}
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setViewMonth(m => subMonths(m, 1))}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <p className="text-sm font-medium text-zinc-700">
+              {format(viewMonth, 'MMMM yyyy', { locale: dateLocale })}
+            </p>
+            <button
+              onClick={() => setViewMonth(m => addMonths(m, 1))}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Day cells */}
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: calendarOffset }).map((_, i) => (
-              <div key={`e${i}`} />
-            ))}
-            {monthDays.map(day => {
-              const ds = format(day, 'yyyy-MM-dd');
-              const pct = monthOccupancy[ds];
-              const isWeekend = getDay(day) === 0 || getDay(day) === 6;
-              return (
-                <div
-                  key={ds}
-                  title={!isWeekend && pct !== undefined ? `${pct}%` : undefined}
-                  className={cn(
-                    'flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-medium',
-                    isWeekend || pct === undefined || pct === 0
-                      ? 'text-zinc-300'
-                      : pct <= 33
-                      ? 'bg-blue-50 text-blue-500'
-                      : pct <= 66
-                      ? 'bg-blue-200 text-blue-800'
-                      : 'bg-blue-500 text-white'
-                  )}
-                >
-                  <span>{format(day, 'd')}</span>
-                  {!isWeekend && pct !== undefined && pct > 0 && (
-                    <span className="text-[9px] leading-none opacity-80">{pct}%</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {/* KPI */}
+          {avgOccupancy !== null && (
+            <div className="mb-3 px-3 py-2 bg-zinc-50 rounded-xl flex items-center justify-between">
+              <span className="text-xs text-zinc-500">{t.avgOccupancy}</span>
+              <span className="text-sm font-semibold text-zinc-800">{avgOccupancy}%</span>
+            </div>
+          )}
 
-          {/* Legend */}
-          <div className="flex gap-3 mt-3 justify-end text-xs text-zinc-400">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-100 border border-blue-200 inline-block"></span>
-              ≤33%
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-300 inline-block"></span>
-              34–66%
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
-              &gt;66%
-            </span>
+          <div className={cn('transition-opacity', monthLoading ? 'opacity-40' : 'opacity-100')}>
+            {/* Day-of-week headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+                <div key={d} className="text-center text-xs font-medium text-zinc-400 py-1">{d}</div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: calendarOffset }).map((_, i) => (
+                <div key={`e${i}`} />
+              ))}
+              {monthDays.map(day => {
+                const ds = format(day, 'yyyy-MM-dd');
+                const pct = monthOccupancy[ds];
+                const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+                const style = !isWeekend && pct !== undefined && pct > 0
+                  ? occupancyStyle(pct)
+                  : undefined;
+                return (
+                  <div
+                    key={ds}
+                    title={!isWeekend && pct !== undefined ? `${pct}%` : undefined}
+                    style={style}
+                    className={cn(
+                      'flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-medium transition-colors',
+                      isWeekend
+                        ? 'text-zinc-200'
+                        : pct === undefined || pct === 0
+                        ? 'text-zinc-400'
+                        : ''
+                    )}
+                  >
+                    <span>{format(day, 'd')}</span>
+                    {!isWeekend && pct !== undefined && pct > 0 && (
+                      <span className="text-[9px] leading-none opacity-80">{pct}%</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
