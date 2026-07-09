@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from 'date-fns';
-import { Users, CheckCircle2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, CheckCircle2, Calendar, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { detectLang, getTranslations, getDateLocale } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
@@ -30,6 +30,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
   const [bookings, setBookings] = useState<any[]>([]);
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date()));
   const [monthOccupancy, setMonthOccupancy] = useState<Record<string, number>>({});
+  const [myMonthDates, setMyMonthDates] = useState<Set<string>>(new Set());
   const [monthLoading, setMonthLoading] = useState(false);
 
   useEffect(() => { fetchDashboardData(); }, []);
@@ -68,7 +69,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
 
       const [{ data: desks }, { data: monthData }] = await Promise.all([
         supabase.from('desks').select('id'),
-        supabase.from('bookings').select('date, desk_id').gte('date', monthStart).lte('date', monthEnd),
+        supabase.from('bookings').select('date, desk_id, user_id').gte('date', monthStart).lte('date', monthEnd),
       ]);
 
       const total = desks?.length ?? 0;
@@ -84,6 +85,9 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
         });
       }
       setMonthOccupancy(pctMap);
+      setMyMonthDates(new Set(
+        (monthData ?? []).filter((b: { user_id: string }) => b.user_id === user.id).map((b: { date: string }) => b.date)
+      ));
     } catch (error) {
       console.error('Error fetching month occupancy:', error);
     } finally {
@@ -302,6 +306,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                 const ds = format(day, 'yyyy-MM-dd');
                 const pct = monthOccupancy[ds];
                 const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+                const isMine = myMonthDates.has(ds);
                 const style = !isWeekend && pct !== undefined && pct > 0
                   ? occupancyStyle(pct)
                   : undefined;
@@ -311,7 +316,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                     title={!isWeekend && pct !== undefined ? `${pct}%` : undefined}
                     style={style}
                     className={cn(
-                      'flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-medium transition-colors',
+                      'relative flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-medium transition-colors',
                       isWeekend
                         ? 'text-zinc-200'
                         : pct === undefined || pct === 0
@@ -322,6 +327,11 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                     <span>{format(day, 'd')}</span>
                     {!isWeekend && pct !== undefined && pct > 0 && (
                       <span className="text-[9px] leading-none opacity-80">{pct}%</span>
+                    )}
+                    {isMine && (
+                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white rounded-full p-px border border-white shadow-sm">
+                        <Check className="w-2 h-2" strokeWidth={3} />
+                      </div>
                     )}
                   </div>
                 );
