@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, addDays, startOfDay } from 'date-fns';
 import { Users, CheckCircle2, Calendar, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { detectLang, getTranslations, getDateLocale } from '../lib/i18n';
 import { cn } from '../lib/utils';
@@ -24,7 +24,7 @@ function occupancyStyle(pct: number): React.CSSProperties {
   };
 }
 
-export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () => void }) {
+export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBookToday?: () => void; onBookDate?: (date: Date) => void }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalDesks: 0, bookedDesks: 0 });
   const [bookings, setBookings] = useState<any[]>([]);
@@ -144,6 +144,10 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
   // Calendar
   const monthDays = eachDayOfInterval({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) });
   const calendarOffset = (getDay(monthDays[0]) + 6) % 7;
+
+  // Booking date strip covers today..today+27 — only those days can jump to Book a Desk
+  const todayStart = startOfDay(new Date());
+  const maxBookable = addDays(todayStart, 27);
 
   // KPI: average occupancy of past workdays in the viewed month (weekends excluded)
   const today = new Date();
@@ -307,16 +311,20 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                 const pct = monthOccupancy[ds];
                 const isWeekend = getDay(day) === 0 || getDay(day) === 6;
                 const isMine = myMonthDates.has(ds);
+                const isBookable = day >= todayStart && day <= maxBookable;
                 const style = !isWeekend && pct !== undefined && pct > 0
                   ? occupancyStyle(pct)
                   : undefined;
                 return (
-                  <div
+                  <button
                     key={ds}
+                    onClick={isBookable && onBookDate ? () => onBookDate(day) : undefined}
+                    disabled={!isBookable}
                     title={!isWeekend && pct !== undefined ? `${pct}%` : undefined}
                     style={style}
                     className={cn(
                       'relative flex flex-col items-center justify-center rounded-lg aspect-square text-xs font-medium transition-colors',
+                      isBookable ? 'cursor-pointer hover:ring-2 hover:ring-zinc-300' : 'cursor-default',
                       isWeekend
                         ? 'text-zinc-200'
                         : pct === undefined || pct === 0
@@ -333,7 +341,7 @@ export function Dashboard({ user, onBookToday }: { user: any; onBookToday?: () =
                         <Check className="w-2 h-2" strokeWidth={3} />
                       </div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>

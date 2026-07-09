@@ -19,6 +19,12 @@ const t = getTranslations(lang).app;
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'booking'>('dashboard');
+  const [bookingInitialDate, setBookingInitialDate] = useState<Date | null>(null);
+
+  const handleBookDate = (date: Date) => {
+    setBookingInitialDate(date);
+    setActiveTab('booking');
+  };
 
   useEffect(() => {
     if (!hasSupabaseCredentials) return;
@@ -112,7 +118,7 @@ export default function App() {
             {t.dashboard}
           </button>
           <button
-            onClick={() => setActiveTab('booking')}
+            onClick={() => { setBookingInitialDate(null); setActiveTab('booking'); }}
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
               activeTab === 'booking'
@@ -126,8 +132,14 @@ export default function App() {
         </div>
 
         {activeTab === 'dashboard'
-          ? <Dashboard user={session.user} onBookToday={() => setActiveTab('booking')} />
-          : <Booking user={session.user} />}
+          ? (
+            <Dashboard
+              user={session.user}
+              onBookToday={() => { setBookingInitialDate(null); setActiveTab('booking'); }}
+              onBookDate={handleBookDate}
+            />
+          )
+          : <Booking user={session.user} initialDate={bookingInitialDate} />}
       </main>
       <Toaster position="top-center" />
     </div>

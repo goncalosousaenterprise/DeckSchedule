@@ -28,9 +28,11 @@ function getOverlapping(deskId: string, bookings: any[], timeOfDay: string) {
   );
 }
 
-export function Booking({ user }: { user: any }) {
+export function Booking({ user, initialDate }: { user: any; initialDate?: Date | null }) {
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    initialDate ? startOfDay(initialDate) : startOfDay(new Date())
+  );
   const [desks, setDesks] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [userBookings, setUserBookings] = useState<{ date: string; time_of_day: string }[]>([]);
