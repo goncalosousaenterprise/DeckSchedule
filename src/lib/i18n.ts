@@ -59,6 +59,9 @@ const translations = {
       you: 'You',
       monthlyOccupancy: 'Monthly Occupancy',
       avgOccupancy: 'Avg. occupancy (weekdays)',
+      reservationsLabel: 'reservations',
+      breakdownTitle: 'Reservation breakdown',
+      realOccupancy: 'Real occupancy',
     },
     booking: {
       title: 'Book a Desk',
@@ -144,6 +147,9 @@ const translations = {
       you: 'Du',
       monthlyOccupancy: 'Monatliche Auslastung',
       avgOccupancy: 'Ø Auslastung (Werktage)',
+      reservationsLabel: 'Buchungen',
+      breakdownTitle: 'Buchungsübersicht',
+      realOccupancy: 'Reale Auslastung',
     },
     booking: {
       title: 'Schreibtisch buchen',

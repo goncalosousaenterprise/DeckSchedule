@@ -8,11 +8,17 @@ import { cn } from '../lib/utils';
 const lang = detectLang();
 const t = getTranslations(lang).dashboard;
 const tTime = getTranslations(lang).timeOfDay;
+const tBooking = getTranslations(lang).booking;
 const dateLocale = getDateLocale(lang);
 
 function formatTimeOfDay(value: string | undefined): string {
   if (!value) return tTime.entire_day;
   return tTime[value as keyof typeof tTime] ?? value.replace('_', ' ');
+}
+
+// Full-day booking = 1.0 desk-equivalent, half-day (morning/afternoon) = 0.5
+function timeOfDayWeight(value: string | null | undefined): number {
+  return value === 'morning' || value === 'afternoon' ? 0.5 : 1;
 }
 
 function occupancyStyle(pct: number): React.CSSProperties {
@@ -26,7 +32,7 @@ function occupancyStyle(pct: number): React.CSSProperties {
 
 export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBookToday?: () => void; onBookDate?: (date: Date) => void }) {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalDesks: 0, bookedDesks: 0 });
+  const [stats, setStats] = useState({ totalDesks: 0, bookedDesks: 0, weightedOccupancy: 0 });
   const [bookings, setBookings] = useState<any[]>([]);
   const [viewMonth, setViewMonth] = useState<Date>(startOfMonth(new Date()));
   const [monthOccupancy, setMonthOccupancy] = useState<Record<string, number>>({});
@@ -52,7 +58,10 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
       if (bookingsError) throw bookingsError;
 
       const uniqueBookedDesks = new Set(todayBookings?.map(b => b.desk_id)).size;
-      setStats({ totalDesks: desks?.length || 0, bookedDesks: uniqueBookedDesks });
+      const weightedOccupancy = (todayBookings ?? []).reduce(
+        (sum, b) => sum + timeOfDayWeight(b.time_of_day), 0
+      );
+      setStats({ totalDesks: desks?.length || 0, bookedDesks: uniqueBookedDesks, weightedOccupancy });
       setBookings(todayBookings || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -69,19 +78,18 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
 
       const [{ data: desks }, { data: monthData }] = await Promise.all([
         supabase.from('desks').select('id'),
-        supabase.from('bookings').select('date, desk_id, user_id').gte('date', monthStart).lte('date', monthEnd),
+        supabase.from('bookings').select('date, user_id, time_of_day').gte('date', monthStart).lte('date', monthEnd),
       ]);
 
       const total = desks?.length ?? 0;
-      const occMap: Record<string, Set<string>> = {};
-      (monthData ?? []).forEach((b: { date: string; desk_id: string }) => {
-        if (!occMap[b.date]) occMap[b.date] = new Set();
-        occMap[b.date].add(b.desk_id);
+      const weightMap: Record<string, number> = {};
+      (monthData ?? []).forEach((b: { date: string; time_of_day?: string }) => {
+        weightMap[b.date] = (weightMap[b.date] ?? 0) + timeOfDayWeight(b.time_of_day);
       });
       const pctMap: Record<string, number> = {};
       if (total > 0) {
-        Object.entries(occMap).forEach(([d, s]) => {
-          pctMap[d] = Math.round((s.size / total) * 100);
+        Object.entries(weightMap).forEach(([d, w]) => {
+          pctMap[d] = Math.round((w / total) * 100);
         });
       }
       setMonthOccupancy(pctMap);
@@ -136,10 +144,35 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
   }
 
   const occupancyRate = stats.totalDesks > 0
-    ? Math.round((stats.bookedDesks / stats.totalDesks) * 100)
+    ? Math.round((stats.weightedOccupancy / stats.totalDesks) * 100)
     : 0;
 
   const myBookings = bookings.filter(b => b.user_id === user.id);
+
+  // Reservation breakdown by time of day
+  const entireDayBookings = bookings.filter(b => timeOfDayWeight(b.time_of_day) === 1);
+  const morningBookings = bookings.filter(b => b.time_of_day === 'morning');
+  const afternoonBookings = bookings.filter(b => b.time_of_day === 'afternoon');
+
+  const renderPeopleGroup = (label: string, list: any[]) => (
+    <div key={label}>
+      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider px-1 mb-2">{label}</p>
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+        <ul className="divide-y divide-zinc-100">
+          {list.map((booking) => (
+            <li key={booking.id} className="p-4 flex items-center gap-3 hover:bg-zinc-50 transition-colors">
+              <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium shrink-0">
+                {(booking.user_name || booking.user_id).substring(0, 2).toUpperCase()}
+              </div>
+              <p className="font-medium text-zinc-900">
+                {booking.user_id === user.id ? t.you : (booking.user_name || `User ${booking.user_id.substring(0, 6)}`)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
 
   // Calendar
   const monthDays = eachDayOfInterval({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) });
@@ -178,9 +211,12 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
               <h3 className="font-medium">{t.occupancy}</h3>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-semibold tracking-tight">{stats.bookedDesks}</span>
+              <span className="text-4xl font-semibold tracking-tight">{stats.weightedOccupancy.toFixed(1)}</span>
               <span className="text-zinc-500 font-medium">/ {stats.totalDesks} {t.desks}</span>
             </div>
+            <p className="text-sm text-zinc-500 mt-1">
+              {stats.bookedDesks}/{stats.totalDesks} {t.desks} &middot; {bookings.length} {t.reservationsLabel}
+            </p>
             <div className="mt-4 w-full bg-zinc-100 rounded-full h-2.5 overflow-hidden">
               <div
                 className={`h-2.5 rounded-full transition-all duration-500 ${
@@ -231,6 +267,28 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
           </div>
         </div>
 
+        <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm">
+          <h3 className="text-sm font-medium text-zinc-500 mb-3">{t.breakdownTitle}</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xl font-semibold text-zinc-900">{entireDayBookings.length}</p>
+              <p className="text-xs text-zinc-500">{tBooking.entireDay}</p>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-zinc-900">{morningBookings.length}</p>
+              <p className="text-xs text-zinc-500">{tBooking.morning}</p>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-zinc-900">{afternoonBookings.length}</p>
+              <p className="text-xs text-zinc-500">{tBooking.afternoon}</p>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-zinc-900">{stats.weightedOccupancy.toFixed(1)}</p>
+              <p className="text-xs text-zinc-500">{t.realOccupancy}</p>
+            </div>
+          </div>
+        </div>
+
         <div>
           <h3 className="text-lg font-semibold mb-4">{t.peopleToday}</h3>
 
@@ -239,24 +297,10 @@ export function Dashboard({ user, onBookToday, onBookDate }: { user: any; onBook
               <p className="text-zinc-500">{t.noOne}</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-              <ul className="divide-y divide-zinc-100">
-                {bookings.map((booking) => (
-                  <li key={booking.id} className="p-4 flex items-center gap-3 hover:bg-zinc-50 transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium shrink-0">
-                      {(booking.user_name || booking.user_id).substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-zinc-900">
-                        {booking.user_id === user.id ? t.you : (booking.user_name || `User ${booking.user_id.substring(0, 6)}`)}
-                      </p>
-                      <p className="text-sm text-zinc-500 capitalize">
-                        {formatTimeOfDay(booking.time_of_day)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            <div className="space-y-6">
+              {entireDayBookings.length > 0 && renderPeopleGroup(tBooking.entireDay, entireDayBookings)}
+              {morningBookings.length > 0 && renderPeopleGroup(tBooking.morning, morningBookings)}
+              {afternoonBookings.length > 0 && renderPeopleGroup(tBooking.afternoon, afternoonBookings)}
             </div>
           )}
         </div>
